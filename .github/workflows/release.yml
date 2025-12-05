@@ -3,153 +3,75 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      bump_major:
-        description: 'Set to true to bump MAJOR version'
-        required: false
-        default: 'false'
-      bump_minor:
-        description: 'Set to true to bump MINOR version'
-        required: false
-        default: 'false'
+      bump:
+        description: 'Version bump type'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 permissions:
   contents: write
+  pull-requests: write   # required for generate_release_notes with PR grouping
 
 jobs:
-  prepare:
-    name: Prepare version and changelog
+  bump-version:
     runs-on: ubuntu-latest
     outputs:
-      tag_name: ${{ steps.set_version.outputs.tag_name }}
-      release_notes: ${{ steps.set_version.outputs.release_notes }}
+      new_tag: ${{ steps.tag.outputs.new_tag }}
+      changelog: ${{ steps.tag.outputs.changelog }}
     steps:
-      - name: Checkout full history
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Determine next semantic version and changelog
-        id: set_version
-        run: |
-          set -e
-          # Find latest semver tag (vMAJOR.MINOR.PATCH)
-          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n1 || true)
-          echo "Latest tag: $LATEST_TAG"
-          if [ -z "$LATEST_TAG" ]; then
-            MAJOR=0; MINOR=0; PATCH=0
-          else
-            TAG=${LATEST_TAG#v}
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$TAG"
-          fi
-
-          if [ "${{ github.event.inputs.bump_major }}" = "true" ]; then
-            NEW_MAJOR=$((MAJOR+1))
-            NEW_MINOR=0
-            NEW_PATCH=0
-          elif [ "${{ github.event.inputs.bump_minor }}" = "true" ]; then
-            NEW_MAJOR=$MAJOR
-            NEW_MINOR=$((MINOR+1))
-            NEW_PATCH=0
-          else
-            NEW_MAJOR=$MAJOR
-            NEW_MINOR=$MINOR
-            NEW_PATCH=$((PATCH+1))
-          fi
-
-          TAG_NAME="v${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}"
-          echo "Calculated new tag: $TAG_NAME"
-
-          # Create changelog from commits between latest tag (if any) and HEAD
-          if [ -z "$LATEST_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%an)" --no-merges HEAD)
-          else
-            CHANGELOG=$(git log --pretty=format:"- %s (%an)" --no-merges ${LATEST_TAG}..HEAD)
-          fi
-
-          if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="No changes"
-          fi
-
-          echo "tag_name<<EOF" >> $GITHUB_OUTPUT
-          echo "$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-          echo "Changes since ${LATEST_TAG:-<initial>}" >> $GITHUB_OUTPUT
-          echo >> $GITHUB_OUTPUT
-          echo "$CHANGELOG" >> $GITHUB_OUTPUT
-          echo >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Bump version and create tag
+        uses: anothrNick/github-tag-action@v1
+        id: tag
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          with_v: true
+          default_bump: ${{ inputs.bump }}
 
   build:
-    name: Build (call reusable build workflow)
+    needs: bump-version
     uses: ./.github/workflows/build.yml
-    needs: prepare
     secrets: inherit
 
   publish:
-    name: Create release and upload assets
+    needs: [bump-version, build]
     runs-on: ubuntu-latest
-    needs: [prepare, build]
     steps:
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: reboot-windows
-          path: ./artifacts/windows
+          path: artifacts/windows
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
           name: reboot-linux
-          path: ./artifacts/linux
+          path: artifacts/linux
 
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
           name: reboot-macos
-          path: ./artifacts/macos
+          path: artifacts/macos
 
-      - name: Install zip (if needed)
-        run: sudo apt-get update && sudo apt-get install -y zip
-
-      - name: Create release assets (zip)
+      - name: Package assets
         run: |
-          rm -f reboot-windows.zip reboot-linux.tar.gz reboot-macos.tar.gz
-          cd artifacts/windows && zip -r ../../reboot-windows.zip . && cd ../../
+          zip -r reboot-windows.zip artifacts/windows/
           tar -czf reboot-linux.tar.gz -C artifacts/linux .
           tar -czf reboot-macos.tar.gz -C artifacts/macos .
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Publish GitHub Release (auto-generated changelog)
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.prepare.outputs.tag_name }}
-          release_name: ${{ needs.prepare.outputs.tag_name }}
-          body: ${{ needs.prepare.outputs.release_notes }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Windows asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./reboot-windows.zip
-          asset_name: reboot-windows.zip
-          asset_content_type: application/zip
-
-      - name: Upload Linux asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./reboot-linux.tar.gz
-          asset_name: reboot-linux.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload macOS asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./reboot-macos.tar.gz
-          asset_name: reboot-macos.tar.gz
-          asset_content_type: application/gzip
+          tag_name: ${{ needs.bump-version.outputs.new_tag }}
+          name: ${{ needs.bump-version.outputs.new_tag }}
+          generate_release_notes: true
+          files: |
+            reboot-windows.zip
+            reboot-linux.tar.gz
+            reboot-macos.tar.gz
