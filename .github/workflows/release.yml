@@ -61,7 +61,7 @@ jobs:
 
       - name: Package assets
         run: |
-          zip -r reboot-windows.zip artifacts/windows/
+          zip -j reboot-windows.zip artifacts/windows/*
           tar -czf reboot-linux.tar.gz -C artifacts/linux .
           tar -czf reboot-macos.tar.gz -C artifacts/macos .
 
