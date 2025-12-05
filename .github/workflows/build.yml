@@ -25,7 +25,14 @@ jobs:
 
       - name: Show compilers (debug)
         shell: pwsh
-        run: 'Get-Command x86_64-w64-mingw32-g++ -ErrorAction SilentlyContinue | ForEach-Object { "x86_64: $($_.Source)" }; Get-Command i686-w64-mingw32-g++ -ErrorAction SilentlyContinue | ForEach-Object { "i686: $($_.Source)" }; & x86_64-w64-mingw32-g++ --version 2>&1 | Select-Object -First 1 || true; & i686-w64-mingw32-g++ --version 2>&1 | Select-Object -First 1 || true'
+        run: |
+          Get-Command x86_64-w64-mingw32-g++ -ErrorAction SilentlyContinue | ForEach-Object { "x86_64: $($_.Source)" }
+          Get-Command i686-w64-mingw32-g++ -ErrorAction SilentlyContinue | ForEach-Object { "i686: $($_.Source)" }
+          Write-Host "Check potential mingw32/mingw64 folders:"
+          if (Test-Path C:\mingw64\bin) { Get-ChildItem C:\mingw64\bin\*g++* | Select-Object FullName, Length -First 5 }
+          if (Test-Path C:\mingw32\bin) { Get-ChildItem C:\mingw32\bin\*g++* | Select-Object FullName, Length -First 5 }
+          & x86_64-w64-mingw32-g++ --version 2>&1 | Select-Object -First 1 || Write-Host 'x86_64 compiler not found'
+          & i686-w64-mingw32-g++ --version 2>&1 | Select-Object -First 1 || Write-Host 'i686 compiler not found'
 
       - name: Build x86_64 binary (explicit cross-compiler)
         shell: pwsh
@@ -33,7 +40,15 @@ jobs:
 
       - name: Build i686 binary (explicit cross-compiler)
         shell: pwsh
-        run: '& i686-w64-mingw32-g++ -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x86.exe reboot.cpp -ladvapi32'
+        run: |
+          $i686path = 'C:\mingw32\bin\i686-w64-mingw32-g++.exe'
+          if (Test-Path $i686path) {
+            Write-Host "Using $i686path"
+            & $i686path -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x86.exe reboot.cpp -ladvapi32
+          } else {
+            Write-Host "Falling back to i686-w64-mingw32-g++ on PATH"
+            & i686-w64-mingw32-g++ -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x86.exe reboot.cpp -ladvapi32
+          }
 
       - name: Strip binaries if strip available
         shell: pwsh
