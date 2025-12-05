@@ -20,18 +20,32 @@ jobs:
         with:
           update: true
           install: |
-            mingw-w64-x86_64-gcc
-            mingw-w64-i686-gcc
+            mingw-w64-x86_64-toolchain
+            mingw-w64-i686-toolchain
 
-      - name: Build x86_64 binary (MSYS2)
+      - name: Show compilers (debug)
         run: |
-          echo "Building x86_64 with MSYS2"
-          bash -lc 'export MSYSTEM=MINGW64 && g++ -O2 -static -o reboot-x64.exe reboot.cpp -ladvapi32'
+          bash -lc 'echo PATH=$PATH; which x86_64-w64-mingw32-g++ || true; which i686-w64-mingw32-g++ || true; x86_64-w64-mingw32-g++ --version || true; i686-w64-mingw32-g++ --version || true'
 
-      - name: Build i686 binary (MSYS2)
+      - name: Build x86_64 binary (explicit cross-compiler)
         run: |
-          echo "Building i686 with MSYS2"
-          bash -lc 'export MSYSTEM=MINGW32 && g++ -O2 -static -o reboot-x86.exe reboot.cpp -ladvapi32'
+          echo "Building x86_64 (x86_64-w64-mingw32-g++)"
+          x86_64-w64-mingw32-g++ -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x64.exe reboot.cpp -ladvapi32
+
+      - name: Build i686 binary (explicit cross-compiler)
+        run: |
+          echo "Building i686 (i686-w64-mingw32-g++)"
+          i686-w64-mingw32-g++ -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x86.exe reboot.cpp -ladvapi32
+
+      - name: Strip binaries if strip available
+        run: |
+          if command -v x86_64-w64-mingw32-strip >/dev/null 2>&1; then x86_64-w64-mingw32-strip reboot-x64.exe || true; fi
+          if command -v i686-w64-mingw32-strip >/dev/null 2>&1; then i686-w64-mingw32-strip reboot-x86.exe || true; fi
+
+      - name: Verify architectures and sizes
+        run: |
+          echo "reboot-x64.exe info:"; objdump -f reboot-x64.exe || true; ls -lh reboot-x64.exe || true
+          echo "reboot-x86.exe info:"; objdump -f reboot-x86.exe || true; ls -lh reboot-x86.exe || true
 
       - name: Prepare Windows artifact directory
         shell: powershell
