@@ -43,7 +43,9 @@ jobs:
 
       - name: Build x86_64 binary (explicit cross-compiler)
         shell: pwsh
-        run: '& x86_64-w64-mingw32-g++ -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x64.exe reboot.cpp -ladvapi32'
+        run: |
+          $compiler = 'x86_64-w64-mingw32-g++'
+          & $compiler '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-o' 'reboot-x64.exe' 'reboot.cpp' '-ladvapi32'
 
       - name: Build i686 binary (explicit cross-compiler)
         shell: pwsh
@@ -51,19 +53,26 @@ jobs:
           $i686path = 'C:\mingw32\bin\i686-w64-mingw32-g++.exe'
           if (Test-Path $i686path) {
             Write-Host "Using $i686path"
-            & $i686path -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x86.exe reboot.cpp -ladvapi32
+            & $i686path '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
           } else {
             Write-Host "Falling back to i686-w64-mingw32-g++ on PATH"
-            & i686-w64-mingw32-g++ -Os -s -ffunction-sections -fdata-sections -Wl,--gc-sections -o reboot-x86.exe reboot.cpp -ladvapi32
+            $compiler = 'i686-w64-mingw32-g++'
+            & $compiler '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
           }
 
       - name: Strip binaries if strip available
         shell: pwsh
-        run: '& x86_64-w64-mingw32-strip reboot-x64.exe -ErrorAction SilentlyContinue; & i686-w64-mingw32-strip reboot-x86.exe -ErrorAction SilentlyContinue'
+        run: |
+          try { & 'x86_64-w64-mingw32-strip' 'reboot-x64.exe' } catch { }
+          try { & 'i686-w64-mingw32-strip' 'reboot-x86.exe' } catch { }
 
       - name: Verify architectures and sizes
         shell: pwsh
-        run: '& objdump -f reboot-x64.exe; Get-Item reboot-x64.exe | Select-Object Name, @{Name="KB";Expression={[math]::Round($_.Length/1024,2)}}; & objdump -f reboot-x86.exe; Get-Item reboot-x86.exe | Select-Object Name, @{Name="KB";Expression={[math]::Round($_.Length/1024,2)}}'
+        run: |
+          try { & 'objdump' '-f' 'reboot-x64.exe' } catch { Write-Host 'objdump not found or failed for reboot-x64.exe' }
+          Get-Item reboot-x64.exe | Select-Object Name, @{Name='KB';Expression={[math]::Round($_.Length/1024,2)}}
+          try { & 'objdump' '-f' 'reboot-x86.exe' } catch { Write-Host 'objdump not found or failed for reboot-x86.exe' }
+          Get-Item reboot-x86.exe | Select-Object Name, @{Name='KB';Expression={[math]::Round($_.Length/1024,2)}}
 
       - name: Prepare Windows artifact directory
         shell: powershell
