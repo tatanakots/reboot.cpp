@@ -1,0 +1,90 @@
+name: Build artifacts
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+  release:
+    types: [created]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 and install toolchains
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: |
+            mingw-w64-x86_64-gcc
+            mingw-w64-i686-gcc
+
+      - name: Build x86_64 binary
+        run: |
+          x86_64-w64-mingw32-g++ -O2 -static -o reboot-x64.exe reboot.cpp -ladvapi32
+
+      - name: Build i686 binary
+        run: |
+          i686-w64-mingw32-g++ -O2 -static -o reboot-x86.exe reboot.cpp -ladvapi32
+
+      - name: Prepare Windows artifact directory
+        shell: powershell
+        run: |
+          $out = "artifact-windows"
+          if (Test-Path $out) { Remove-Item -Recurse -Force $out }
+          New-Item -ItemType Directory -Path $out
+          Copy-Item -Path reboot-x64.exe, reboot-x86.exe, install.bat -Destination $out
+
+      - name: Upload Windows artifact directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: reboot-windows
+          path: artifact-windows
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Build Linux binary
+        run: g++ -O2 -o reboot reboot.cpp
+
+      - name: Prepare Linux artifact directory
+        run: |
+          rm -rf artifact-linux
+          mkdir -p artifact-linux
+          cp reboot artifact-linux/
+
+      - name: Upload Linux artifact directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: reboot-linux
+          path: artifact-linux
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build macOS binary
+        run: clang++ -O2 -o reboot reboot.cpp -framework CoreFoundation -framework ApplicationServices
+
+      - name: Prepare macOS artifact directory
+        run: |
+          rm -rf artifact-macos
+          mkdir -p artifact-macos
+          cp reboot artifact-macos/
+
+      - name: Upload macOS artifact directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: reboot-macos
+          path: artifact-macos
