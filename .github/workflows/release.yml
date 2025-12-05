@@ -18,19 +18,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
-      changelog: ${{ steps.tag.outputs.changelog }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Bump version and create tag
-        uses: anothrNick/github-tag-action@v1
         id: tag
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          with_v: true
-          default_bump: ${{ inputs.bump }}
+        uses: anothrNick/github-tag-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: ${{ inputs.bump }}
+          TAG_PREFIX: v
+          RELEASE_BRANCHES: master,main
 
   build:
     needs: bump-version
