@@ -22,13 +22,15 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-i686-gcc
 
-      - name: Build x86_64 binary
+      - name: Build x86_64 binary (MSYS2)
         run: |
-          x86_64-w64-mingw32-g++ -O2 -static -o reboot-x64.exe reboot.cpp -ladvapi32
+          echo "Building x86_64 with MSYS2"
+          bash -lc 'export MSYSTEM=MINGW64 && g++ -O2 -static -o reboot-x64.exe reboot.cpp -ladvapi32'
 
-      - name: Build i686 binary
+      - name: Build i686 binary (MSYS2)
         run: |
-          i686-w64-mingw32-g++ -O2 -static -o reboot-x86.exe reboot.cpp -ladvapi32
+          echo "Building i686 with MSYS2"
+          bash -lc 'export MSYSTEM=MINGW32 && g++ -O2 -static -o reboot-x86.exe reboot.cpp -ladvapi32'
 
       - name: Prepare Windows artifact directory
         shell: powershell

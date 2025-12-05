@@ -8,7 +8,6 @@
 #ifdef _WIN32
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
-    #include <tchar.h>
 #else
     #include <unistd.h>
     #include <sys/reboot.h>
@@ -17,8 +16,8 @@
         #include <linux/reboot.h>
     #endif
     #ifdef __APPLE__
-        #include <mach/mach.h>
-        #include <CoreFoundation/CoreFoundation.h>
+        #include <CoreServices/CoreServices.h>
+        #include <Carbon/Carbon.h>
     #endif
 #endif
 
@@ -27,6 +26,31 @@ static void print_help() {
                  "Immediately reboots the computer.\n"
                  "Requires administrator/root privileges.\n";
 }
+
+#ifdef __APPLE__
+static OSStatus SendAppleEventToSystemProcess(AEEventID eventToSendID) {
+    AEAddressDesc targetDesc;
+    static const ProcessSerialNumber kPSNOfSystemProcess = {0, kSystemProcess};
+    AppleEvent eventReply = {typeNull, NULL};
+    AppleEvent eventToSend = {typeNull, NULL};
+
+    OSStatus status = AECreateDesc(typeProcessSerialNumber, &kPSNOfSystemProcess,
+                                   sizeof(kPSNOfSystemProcess), &targetDesc);
+    if (status != noErr) return status;
+
+    status = AECreateAppleEvent(kCoreEventClass, eventToSendID, &targetDesc,
+                                kAutoGenerateReturnID, kAnyTransactionID, &eventToSend);
+    AEDisposeDesc(&targetDesc);
+    if (status != noErr) return status;
+
+    status = AESendMessage(&eventToSend, &eventReply, kAENormalPriority, kAEDefaultTimeout);
+    AEDisposeDesc(&eventToSend);
+    if (status != noErr) return status;
+
+    AEDisposeDesc(&eventReply);
+    return status;
+}
+#endif
 
 int main(int argc, char* argv[]) {
     if (argc > 1) {
@@ -83,17 +107,15 @@ int main(int argc, char* argv[]) {
     }
 
 #else
-    // Linux and macOS: use reboot(2) syscall with RB_AUTOBOOT
+    // Unix-like: use reboot(2) syscall with RB_AUTOBOOT
     #ifdef __APPLE__
-        // macOS does not allow direct reboot(2) from user space in recent versions
-        // Fall back to the most low-level allowed method via AECall
-        AEEventID eventClass = kAEShutDownEventClass;
-        AEEventID eventID    = kAERestart;
-        OSStatus status = AESendMessage(
-            kAEQuitApplication, &eventID, kAEQueueReply, kAENoTimeout
-        );
+        if (geteuid() != 0) {
+            std::cerr << "Error: Root privileges required.\n";
+            return 1;
+        }
+        OSStatus status = SendAppleEventToSystemProcess(kAERestart);
         if (status != noErr) {
-            std::cerr << "Error: macOS restart failed. Requires root or System Settings permission.\n";
+            std::cerr << "Error: Failed to send restart event (code: " << status << "). Requires root or System Settings permission.\n";
             return 1;
         }
     #else
