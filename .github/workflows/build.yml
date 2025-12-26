@@ -20,8 +20,8 @@ jobs:
         with:
           update: true
           install: |
-            mingw-w64-x86_64-toolchain-win32
-            mingw-w64-i686-toolchain-win32
+            mingw-w64-x86_64-gcc-threads-win32
+            mingw-w64-i686-gcc-threads-win32
 
       - name: Add mingw bins to PATH for subsequent steps
         shell: pwsh
