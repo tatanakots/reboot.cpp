@@ -15,63 +15,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup MSYS2 and install toolchains
-        uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          install: |
-            mingw-w64-x86_64-gcc-threads-win32
-            mingw-w64-i686-gcc-threads-win32
-
-      - name: Add mingw bins to PATH for subsequent steps
-        shell: pwsh
+      - name: Build x86_64 binary with MSVC
+        shell: cmd
         run: |
-          Write-Host "Adding C:\\mingw64\\bin and C:\\mingw32\\bin to PATH for remaining steps"
-          if (Test-Path 'C:\mingw64\bin') { "C:\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
-          if (Test-Path 'C:\mingw32\bin') { "C:\mingw32\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append }
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cl.exe /MT /O1 /GL /GR- /EHsc- /GS- /std:c++17 /DNDEBUG /OPT:REF /OPT:ICF /DEBUG:NONE /SUBSYSTEM:CONSOLE /OUT:reboot-x64.exe reboot.cpp advapi32.lib
 
-      - name: Show compilers (debug)
-        shell: pwsh
+      - name: Build i686 binary with MSVC
+        shell: cmd
         run: |
-          Get-Command x86_64-w64-mingw32-g++ -ErrorAction SilentlyContinue | ForEach-Object { "x86_64: $($_.Source)" }
-          Get-Command i686-w64-mingw32-g++ -ErrorAction SilentlyContinue | ForEach-Object { "i686: $($_.Source)" }
-          Write-Host "Check potential mingw32/mingw64 folders:"
-          if (Test-Path C:\mingw64\bin) { Get-ChildItem C:\mingw64\bin\*g++* | Select-Object FullName, Length -First 5 }
-          if (Test-Path C:\mingw32\bin) { Get-ChildItem C:\mingw32\bin\*g++* | Select-Object FullName, Length -First 5 }
-          & x86_64-w64-mingw32-g++ --version 2>&1 | Select-Object -First 1 || Write-Host 'x86_64 compiler not found'
-          & i686-w64-mingw32-g++ --version 2>&1 | Select-Object -First 1 || Write-Host 'i686 compiler not found'
-
-      - name: Build x86_64 binary (explicit cross-compiler)
-        shell: pwsh
-        run: |
-          $compiler = 'x86_64-w64-mingw32-g++'
-          & $compiler '-Os' '-s' '-flto' '-fno-exceptions' '-fno-rtti' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-Wl,--strip-all' '-static-libgcc' '-static-libstdc++' '-o' 'reboot-x64.exe' 'reboot.cpp' '-ladvapi32'
-
-      - name: Build i686 binary (explicit cross-compiler)
-        shell: pwsh
-        run: |
-          $i686path = 'C:\mingw32\bin\i686-w64-mingw32-g++.exe'
-          if (Test-Path $i686path) {
-            Write-Host "Using $i686path"
-            & $i686path '-Os' '-s' '-flto' '-fno-exceptions' '-fno-rtti' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-Wl,--strip-all' '-static-libgcc' '-static-libstdc++' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
-          } else {
-            Write-Host "Falling back to i686-w64-mingw32-g++ on PATH"
-            $compiler = 'i686-w64-mingw32-g++'
-            & $compiler '-Os' '-s' '-flto' '-fno-exceptions' '-fno-rtti' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-Wl,--strip-all' '-static-libgcc' '-static-libstdc++' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
-          }
-
-      - name: Strip binaries if strip available
-        shell: pwsh
-        run: |
-          try { & 'x86_64-w64-mingw32-strip' 'reboot-x64.exe' } catch { }
-          try { & 'i686-w64-mingw32-strip' 'reboot-x86.exe' } catch { }
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat"
+          cl.exe /MT /O1 /GL /GR- /EHsc- /GS- /std:c++17 /DNDEBUG /OPT:REF /OPT:ICF /DEBUG:NONE /SUBSYSTEM:CONSOLE /OUT:reboot-x86.exe reboot.cpp advapi32.lib
 
       - name: Verify architectures and sizes
         shell: pwsh
         run: |
-          try { & 'objdump' '-f' 'reboot-x64.exe' } catch { Write-Host 'objdump not found or failed for reboot-x64.exe' }
           Get-Item reboot-x64.exe | Select-Object Name, @{Name='KB';Expression={[math]::Round($_.Length/1024,2)}}
-          try { & 'objdump' '-f' 'reboot-x86.exe' } catch { Write-Host 'objdump not found or failed for reboot-x86.exe' }
           Get-Item reboot-x86.exe | Select-Object Name, @{Name='KB';Expression={[math]::Round($_.Length/1024,2)}}
 
       - name: Prepare Windows artifact directory
