@@ -13,7 +13,7 @@ set SCRIPT_DIR=%~dp0
 net session >nul 2>&1
 if %errorlevel% NEQ 0 (
   echo Requesting elevation...
-  powershell -Command "Start-Process -FilePath '%COMSPEC%' -ArgumentList '/c','\"%~f0\"' -Verb RunAs"
+  powershell -NoProfile -Command "Start-Process -FilePath '%COMSPEC%' -ArgumentList '/c \"%~f0\"' -Verb RunAs"
   exit /b
 )
 

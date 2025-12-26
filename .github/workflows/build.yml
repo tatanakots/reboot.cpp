@@ -45,7 +45,7 @@ jobs:
         shell: pwsh
         run: |
           $compiler = 'x86_64-w64-mingw32-g++'
-          & $compiler '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-o' 'reboot-x64.exe' 'reboot.cpp' '-ladvapi32'
+          & $compiler '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-static-libgcc' '-static-libstdc++' '-o' 'reboot-x64.exe' 'reboot.cpp' '-ladvapi32'
 
       - name: Build i686 binary (explicit cross-compiler)
         shell: pwsh
@@ -53,11 +53,11 @@ jobs:
           $i686path = 'C:\mingw32\bin\i686-w64-mingw32-g++.exe'
           if (Test-Path $i686path) {
             Write-Host "Using $i686path"
-            & $i686path '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
+            & $i686path '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-static-libgcc' '-static-libstdc++' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
           } else {
             Write-Host "Falling back to i686-w64-mingw32-g++ on PATH"
             $compiler = 'i686-w64-mingw32-g++'
-            & $compiler '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
+            & $compiler '-Os' '-s' '-ffunction-sections' '-fdata-sections' '-Wl,--gc-sections' '-static-libgcc' '-static-libstdc++' '-o' 'reboot-x86.exe' 'reboot.cpp' '-ladvapi32'
           }
 
       - name: Strip binaries if strip available
