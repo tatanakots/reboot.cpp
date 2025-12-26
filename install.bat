@@ -5,6 +5,7 @@ setlocal
 :: Expected filenames in the same folder as this script:
 :: - reboot-x64.exe (64-bit build)
 :: - reboot-x86.exe (32-bit build)
+:: Will create reboot.exe, and hard links for poweroff.exe, halt.exe
 
 set SCRIPT_DIR=%~dp0
 
@@ -32,37 +33,77 @@ set WIN_DIR=%WINDIR%
 echo Detected system architecture: %ARCH%-bit
 
 if "%ARCH%"=="64" (
-  if exist "%SCRIPT_DIR%reboot-x64.exe" (
-    copy /Y "%SCRIPT_DIR%reboot-x64.exe" "%WIN_DIR%\System32\reboot.exe" >nul
-    if %errorlevel% EQU 0 (
-      echo Installed 64-bit binary to %WIN_DIR%\System32\reboot.exe
-    ) else (
-      echo Failed to copy 64-bit binary to %WIN_DIR%\System32
-    )
-  ) else (
-    echo Warning: 64-bit binary not found at "%SCRIPT_DIR%reboot-x64.exe"
-  )
-
-  if exist "%SCRIPT_DIR%reboot-x86.exe" (
-    copy /Y "%SCRIPT_DIR%reboot-x86.exe" "%WIN_DIR%\SysWOW64\reboot.exe" >nul
-    if %errorlevel% EQU 0 (
-      echo Installed 32-bit binary to %WIN_DIR%\SysWOW64\reboot.exe
-    ) else (
-      echo Failed to copy 32-bit binary to %WIN_DIR%\SysWOW64
-    )
-  ) else (
-    echo Warning: 32-bit binary not found at "%SCRIPT_DIR%reboot-x86.exe"
-  )
+  set SRC_64=%SCRIPT_DIR%reboot-x64.exe
+  set SRC_32=%SCRIPT_DIR%reboot-x86.exe
+  set DST_DIR_64=%WIN_DIR%\System32
+  set DST_DIR_32=%WIN_DIR%\SysWOW64
 ) else (
-  if exist "%SCRIPT_DIR%reboot-x86.exe" (
-    copy /Y "%SCRIPT_DIR%reboot-x86.exe" "%WIN_DIR%\System32\reboot.exe" >nul
-    if %errorlevel% EQU 0 (
-      echo Installed 32-bit binary to %WIN_DIR%\System32\reboot.exe
+  set SRC_32=%SCRIPT_DIR%reboot-x86.exe
+  set DST_DIR_64=%WIN_DIR%\System32
+  set DST_DIR_32=%WIN_DIR%\System32
+)
+
+for %%c in (reboot poweroff halt) do (
+  if "%ARCH%"=="64" (
+    if exist "%SRC_64%" (
+      if "%%c"=="reboot" (
+        copy /Y "%SRC_64%" "%DST_DIR_64%\%%c.exe" >nul
+        if %errorlevel% EQU 0 (
+          echo Installed 64-bit %%c to %DST_DIR_64%\%%c.exe
+        ) else (
+          echo Failed to copy 64-bit %%c to %DST_DIR_64%
+        )
+      ) else (
+        mklink /H "%DST_DIR_64%\%%c.exe" "%DST_DIR_64%\reboot.exe" >nul
+        if %errorlevel% EQU 0 (
+          echo Created hard link for 64-bit %%c to %DST_DIR_64%\%%c.exe
+        ) else (
+          echo Failed to create hard link for 64-bit %%c
+        )
+      )
     ) else (
-      echo Failed to copy 32-bit binary to %WIN_DIR%\System32
+      echo Warning: 64-bit binary not found at "%SRC_64%"
+    )
+
+    if exist "%SRC_32%" (
+      if "%%c"=="reboot" (
+        copy /Y "%SRC_32%" "%DST_DIR_32%\%%c.exe" >nul
+        if %errorlevel% EQU 0 (
+          echo Installed 32-bit %%c to %DST_DIR_32%\%%c.exe
+        ) else (
+          echo Failed to copy 32-bit %%c to %DST_DIR_32%
+        )
+      ) else (
+        mklink /H "%DST_DIR_32%\%%c.exe" "%DST_DIR_32%\reboot.exe" >nul
+        if %errorlevel% EQU 0 (
+          echo Created hard link for 32-bit %%c to %DST_DIR_32%\%%c.exe
+        ) else (
+          echo Failed to create hard link for 32-bit %%c
+        )
+      )
+    ) else (
+      echo Warning: 32-bit binary not found at "%SRC_32%"
     )
   ) else (
-    echo Warning: 32-bit binary not found at "%SCRIPT_DIR%reboot-x86.exe"
+    if exist "%SRC_32%" (
+      if "%%c"=="reboot" (
+        copy /Y "%SRC_32%" "%DST_DIR_64%\%%c.exe" >nul
+        if %errorlevel% EQU 0 (
+          echo Installed 32-bit %%c to %DST_DIR_64%\%%c.exe
+        ) else (
+          echo Failed to copy 32-bit %%c to %DST_DIR_64%
+        )
+      ) else (
+        mklink /H "%DST_DIR_64%\%%c.exe" "%DST_DIR_64%\reboot.exe" >nul
+        if %errorlevel% EQU 0 (
+          echo Created hard link for 32-bit %%c to %DST_DIR_64%\%%c.exe
+        ) else (
+          echo Failed to create hard link for 32-bit %%c
+        )
+      )
+    ) else (
+      echo Warning: 32-bit binary not found at "%SRC_32%"
+    )
   )
 )
 
