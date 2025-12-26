@@ -19,13 +19,13 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" amd64
-          cl.exe /MT /O1 /GL /GR- /EH- /GS- /std:c++17 /DNDEBUG /OPT:REF /OPT:ICF /DEBUG:NONE /SUBSYSTEM:CONSOLE /OUT:reboot-x64.exe reboot.cpp advapi32.lib /link /LTCG
+          cl.exe /MT /O1 /GL /GR- /EHs-c- /GS- /std:c++17 /DNDEBUG reboot.cpp /link /OUT:reboot-x64.exe /OPT:REF /OPT:ICF /DEBUG:NONE /SUBSYSTEM:CONSOLE advapi32.lib /LTCG
 
       - name: Build i686 binary with MSVC
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
-          cl.exe /MT /O1 /GL /GR- /EH- /GS- /std:c++17 /DNDEBUG /OPT:REF /OPT:ICF /DEBUG:NONE /SUBSYSTEM:CONSOLE /OUT:reboot-x86.exe reboot.cpp advapi32.lib /link /LTCG
+          cl.exe /MT /O1 /GL /GR- /EHs-c- /GS- /std:c++17 /DNDEBUG reboot.cpp /link /OUT:reboot-x86.exe /OPT:REF /OPT:ICF /DEBUG:NONE /SUBSYSTEM:CONSOLE advapi32.lib /LTCG
 
       - name: Verify architectures and sizes
         shell: pwsh
